@@ -194,6 +194,79 @@
             cursor: pointer;
             border: 1px solid var(--border);
         }
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            padding: 0 22px 12px;
+            flex-wrap: wrap;
+        }
+        .suggestion-chip {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .quick-replies {
+            display: flex;
+            gap: 8px;
+            padding: 0 22px 10px;
+            flex-wrap: wrap;
+        }
+        .quick-reply {
+            border: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(124,58,237,0.12));
+            color: var(--text);
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .drop-hint {
+            padding: 0 22px 10px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .chat-area.drag-over {
+            outline: 2px dashed var(--accent);
+            outline-offset: 6px;
+        }
+        .bubble-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            justify-content: flex-end;
+        }
+        .bubble-action {
+            border: none;
+            background: rgba(0,0,0,0.06);
+            color: var(--text);
+            border-radius: 999px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .bubble.user .bubble-action {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .response-controls {
+            display: flex;
+            gap: 8px;
+            padding: 0 22px 10px;
+            flex-wrap: wrap;
+        }
+        .response-control {
+            border: 1px solid var(--border);
+            background: rgba(37,99,235,0.08);
+            color: var(--text);
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            cursor: pointer;
+        }
         .attachment-row {
             display: flex;
             gap: 8px;
@@ -293,6 +366,27 @@
             <button class="emoji-btn" type="button">💡</button>
         </div>
 
+        <div class="suggestions" id="suggestions">
+            <button class="suggestion-chip" type="button">What is AI?</button>
+            <button class="suggestion-chip" type="button">Explain machine learning</button>
+            <button class="suggestion-chip" type="button">Tell me a fun fact</button>
+        </div>
+
+        <div class="quick-replies" id="quick-replies">
+            <button class="quick-reply" type="button">Summarize this topic</button>
+            <button class="quick-reply" type="button">Give me a plan</button>
+            <button class="quick-reply" type="button">Help me brainstorm</button>
+        </div>
+
+        <div class="drop-hint">Drop files here to attach them. Shortcuts: Ctrl/Cmd + Enter to send, / to focus the box.</div>
+
+        <div class="response-controls">
+            <button class="response-control" id="regen-btn" type="button">🔁 Regenerate</button>
+            <button class="response-control" id="stop-btn" type="button">⏹️ Stop</button>
+            <button class="response-control" id="continue-btn" type="button">▶️ Continue</button>
+            <button class="response-control" id="retry-btn" type="button">🔄 Retry</button>
+        </div>
+
         <div class="attachment-row">
             <label class="attachment-btn"><input type="file" id="file-upload" style="display:none" />📎 File</label>
             <label class="attachment-btn"><input type="file" id="image-upload" accept="image/*" style="display:none" />🖼️ Image</label>
@@ -316,16 +410,163 @@
         const searchToggle = document.getElementById('search-toggle');
         const voiceBtn = document.getElementById('voice-btn');
         const conversationList = document.getElementById('conversation-list');
+        const quickReplies = Array.from(document.querySelectorAll('.quick-reply'));
+        const suggestionChips = Array.from(document.querySelectorAll('.suggestion-chip'));
+        const regenBtn = document.getElementById('regen-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const continueBtn = document.getElementById('continue-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        let editingBubble = null;
+        let recognition = null;
+        let isListening = false;
+        let responseState = { active: false, stopped: false, bubble: null, prompt: '', fullText: '', words: [], index: 0, timer: null };
+        let lastPrompt = '';
 
-        function addBubble(text, type, withReactions = false) {
+        function createBubble(type) {
             const div = document.createElement('div');
             div.className = `bubble ${type}`;
-            div.innerHTML = text;
+            return div;
+        }
+
+        function attachBubbleActions(div, type) {
+            div.querySelector('.bubble-actions')?.remove();
+            const actions = document.createElement('div');
+            actions.className = 'bubble-actions';
+            if (type === 'bot') {
+                actions.innerHTML = '<button class="bubble-action" type="button" data-action="copy">📋 Copy</button><button class="bubble-action" type="button" data-action="speak">🔊 Speak</button>';
+            } else {
+                actions.innerHTML = '<button class="bubble-action" type="button" data-action="copy">📋 Copy</button><button class="bubble-action" type="button" data-action="edit">✏️ Edit</button>';
+            }
+            actions.querySelectorAll('button').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const action = button.getAttribute('data-action');
+                    if (action === 'copy') {
+                        navigator.clipboard.writeText(div.dataset.text || '').catch(() => {});
+                        addBubble('Copied to clipboard.', 'bot');
+                    } else if (action === 'speak') {
+                        speakText(div.dataset.text || '');
+                    } else if (action === 'edit' && type === 'user') {
+                        questionInput.value = div.dataset.text || '';
+                        editingBubble = div;
+                        questionInput.focus();
+                    }
+                });
+            });
+            div.appendChild(actions);
+        }
+
+        function addBubble(text, type, withReactions = false) {
+            const div = createBubble(type);
+            const content = document.createElement('div');
+            content.innerHTML = text;
+            div.appendChild(content);
+            const plainText = typeof text === 'string' ? text : '';
+            const cleanedText = plainText.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '');
+            div.dataset.text = cleanedText.replace(/\s+/g, ' ').trim();
+            attachBubbleActions(div, type);
             if (withReactions) {
-                div.innerHTML += '<div class="reactions"><button class="react-btn">👍</button><button class="react-btn">❤️</button></div>';
+                const reactions = document.createElement('div');
+                reactions.className = 'reactions';
+                reactions.innerHTML = '<button class="react-btn">👍</button><button class="react-btn">❤️</button>';
+                div.appendChild(reactions);
             }
             chatArea.appendChild(div);
             chatArea.scrollTop = chatArea.scrollHeight;
+            return div;
+        }
+
+        function speakText(text) {
+            if (!text || !('speechSynthesis' in window)) return;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function finalizeResponseBubble(bubble, text) {
+            bubble.innerHTML = '';
+            const content = document.createElement('div');
+            content.innerHTML = renderMarkdown(text);
+            bubble.appendChild(content);
+            bubble.dataset.text = text;
+            attachBubbleActions(bubble, 'bot');
+            responseState.active = false;
+            responseState.stopped = false;
+            responseState.timer = null;
+        }
+
+        function streamResponseText(bubble, text, startIndex = 0) {
+            const words = text.split(/\s+/).filter(Boolean);
+            responseState.active = true;
+            responseState.stopped = false;
+            responseState.bubble = bubble;
+            responseState.prompt = lastPrompt;
+            responseState.fullText = text;
+            responseState.words = words;
+            responseState.index = Math.max(0, startIndex);
+            const writeNext = () => {
+                if (!responseState.active || responseState.stopped) return;
+                if (responseState.index >= responseState.words.length) {
+                    finalizeResponseBubble(bubble, text);
+                    return;
+                }
+                const partial = responseState.words.slice(0, responseState.index + 1).join(' ');
+                bubble.innerHTML = '';
+                const content = document.createElement('div');
+                content.innerHTML = renderMarkdown(partial);
+                bubble.appendChild(content);
+                bubble.dataset.text = text;
+                responseState.index += 1;
+                responseState.timer = setTimeout(writeNext, 35 + Math.min(40, responseState.index * 6));
+            };
+            writeNext();
+        }
+
+        function stopGeneration() {
+            if (!responseState.active) return;
+            responseState.stopped = true;
+            if (responseState.timer) {
+                clearTimeout(responseState.timer);
+            }
+            if (responseState.bubble && responseState.fullText) {
+                finalizeResponseBubble(responseState.bubble, responseState.fullText);
+            }
+        }
+
+        function continueGeneration() {
+            if (!responseState.bubble || !responseState.fullText || responseState.active) return;
+            if (responseState.stopped) {
+                streamResponseText(responseState.bubble, responseState.fullText, responseState.index);
+            }
+        }
+
+        function regenerateResponse() {
+            if (!lastPrompt) return;
+            if (responseState.bubble) {
+                responseState.bubble.remove();
+            }
+            const botBubble = addBubble('Thinking…', 'bot');
+            streamResponseText(botBubble, 'Generating a fresh response…', 0);
+            fetchAnswer(lastPrompt, botBubble);
+        }
+
+        function retryResponse() {
+            regenerateResponse();
+        }
+
+        function fetchAnswer(question, botBubble) {
+            const typingBubble = addTypingIndicator();
+            fetch(`/ask?question=${encodeURIComponent(question)}`)
+                .then((response) => response.json())
+                .then((data) => {
+                    chatArea.removeChild(typingBubble);
+                    const answer = data.answer || 'No answer returned.';
+                    streamResponseText(botBubble, answer, 0);
+                })
+                .catch((error) => {
+                    chatArea.removeChild(typingBubble);
+                    streamResponseText(botBubble, 'Error: ' + error.message, 0);
+                });
         }
 
         function addTypingIndicator() {
@@ -375,8 +616,94 @@
             });
         });
 
-        voiceBtn.addEventListener('click', () => {
-            questionInput.value = '🎤 Voice input ready — speak to your assistant.';
+        suggestionChips.forEach((chip) => {
+            chip.addEventListener('click', () => {
+                questionInput.value = chip.textContent;
+                questionInput.focus();
+            });
+        });
+
+        quickReplies.forEach((reply) => {
+            reply.addEventListener('click', () => {
+                questionInput.value = reply.textContent;
+                questionInput.focus();
+            });
+        });
+
+        function toggleSpeechToText() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                addBubble('Speech recognition is not supported in this browser.', 'bot');
+                return;
+            }
+            if (!recognition) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.onresult = (event) => {
+                    const transcript = Array.from(event.results).map((result) => result[0].transcript).join(' ');
+                    questionInput.value = transcript;
+                };
+                recognition.onerror = () => {
+                    isListening = false;
+                    voiceBtn.textContent = '🎤 Voice';
+                };
+                recognition.onend = () => {
+                    isListening = false;
+                    voiceBtn.textContent = '🎤 Voice';
+                };
+            }
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+                voiceBtn.textContent = '🎤 Voice';
+                return;
+            }
+            recognition.start();
+            isListening = true;
+            voiceBtn.textContent = '🛑 Stop';
+        }
+
+        voiceBtn.addEventListener('click', toggleSpeechToText);
+        regenBtn.addEventListener('click', regenerateResponse);
+        stopBtn.addEventListener('click', stopGeneration);
+        continueBtn.addEventListener('click', continueGeneration);
+        retryBtn.addEventListener('click', retryResponse);
+
+        ['dragenter', 'dragover'].forEach((eventName) => {
+            chatArea.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                chatArea.classList.add('drag-over');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach((eventName) => {
+            chatArea.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                chatArea.classList.remove('drag-over');
+            });
+        });
+
+        chatArea.addEventListener('drop', (event) => {
+            const files = Array.from(event.dataTransfer?.files || []);
+            if (!files.length) return;
+            const names = files.map((file) => file.name).join(', ');
+            addBubble(`Dropped attachment${files.length > 1 ? 's' : ''}: ${names}`, 'bot');
+        });
+
+        document.addEventListener('keydown', (event) => {
+            const key = event.key;
+            if ((event.ctrlKey || event.metaKey) && key === 'Enter') {
+                event.preventDefault();
+                form.requestSubmit();
+            } else if (key === '/' && document.activeElement !== questionInput) {
+                event.preventDefault();
+                questionInput.focus();
+            } else if (key === 'Escape') {
+                questionInput.value = '';
+                editingBubble = null;
+            }
         });
 
         conversationList.querySelectorAll('.conversation-pill').forEach((pill) => {
@@ -393,19 +720,27 @@
             if (!question) return;
 
             const displayQuestion = question.replace(/\n/g, '<br>');
-            addBubble(displayQuestion + ' 😊', 'user', true);
+            if (editingBubble) {
+                editingBubble.innerHTML = displayQuestion + ' ✏️';
+                editingBubble.dataset.text = question;
+                editingBubble = null;
+            } else {
+                addBubble(displayQuestion + ' 😊', 'user', true);
+            }
             questionInput.value = '';
+            lastPrompt = question;
+            const botBubble = addBubble('Thinking…', 'bot');
             const typingBubble = addTypingIndicator();
 
             try {
                 const response = await fetch(`/ask?question=${encodeURIComponent(question)}`);
                 const data = await response.json();
                 chatArea.removeChild(typingBubble);
-                const rendered = renderMarkdown(data.answer || 'No answer returned.');
-                addBubble(rendered, 'bot', true);
+                const answer = data.answer || 'No answer returned.';
+                streamResponseText(botBubble, answer, 0);
             } catch (error) {
                 chatArea.removeChild(typingBubble);
-                addBubble('Error: ' + error.message, 'bot');
+                streamResponseText(botBubble, 'Error: ' + error.message, 0);
             }
         });
     </script>
