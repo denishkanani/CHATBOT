@@ -441,6 +441,7 @@
             <label class="attachment-btn"><input type="file" id="video-upload" accept="video/*" style="display:none" />🎬 Video</label>
             <button class="attachment-btn" id="voice-btn" type="button">🎤 Voice</button>
         </div>
+        <div class="drop-hint">Upload documents such as images, PDFs, Word files, spreadsheets, slides, audio, video, ZIP, CSV, or JSON. The assistant can read and summarize them.</div>
 
         <div class="hint">Try: “What is Artificial Intelligence?”</div>
 
@@ -473,6 +474,7 @@
         const agentToggle = document.getElementById('agent-toggle');
         const selfCorrectToggle = document.getElementById('self-correct-toggle');
         const cotToggle = document.getElementById('cot-toggle');
+        const fileUpload = document.getElementById('file-upload');
         let editingBubble = null;
         let recognition = null;
         let isListening = false;
@@ -762,6 +764,27 @@
             if (!files.length) return;
             const names = files.map((file) => file.name).join(', ');
             addBubble(`Dropped attachment${files.length > 1 ? 's' : ''}: ${names}`, 'bot');
+        });
+
+        async function uploadFile(file, promptText) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('question', promptText || 'Summarize this document.');
+            const response = await fetch('/upload', { method: 'POST', body: formData });
+            return response.json();
+        }
+
+        fileUpload.addEventListener('change', async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            addBubble(`Uploading ${file.name}...`, 'bot');
+            try {
+                const result = await uploadFile(file, 'Summarize and answer questions about this uploaded content.');
+                addBubble(result.answer || 'No analysis available.', 'bot', true);
+            } catch (error) {
+                addBubble('Upload error: ' + error.message, 'bot');
+            }
+            event.target.value = '';
         });
 
         document.addEventListener('keydown', (event) => {

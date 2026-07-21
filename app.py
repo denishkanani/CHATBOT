@@ -1,9 +1,12 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from search import search_google
 from llm import ask_llm
 from config import config
+from multimedia import extract_text_from_file
+import os
+import tempfile
 
 app = FastAPI(title="AI Research Assistant")
 templates = Jinja2Templates(directory="templates")
@@ -36,3 +39,26 @@ def ask(question: str, personality: str = "helpful", reasoning: bool = False, re
         "answer": answer,
         "sources": results
     }
+
+@app.post("/upload")
+async def upload(file: UploadFile = File(...), question: str = Form(default="Summarize this document.")):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename or "file")[1] or ".bin") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        text, metadata = extract_text_from_file(tmp_path, file.filename)
+        if not text:
+            return JSONResponse(status_code=400, content={"error": "This file type is not yet fully supported for reading."})
+        answer = ask_llm(f"{question}\n\nDocument content:\n{text}", [], options={"reasoning": True, "reflection": True, "planning": True})
+        return {
+            "filename": file.filename,
+            "answer": answer,
+            "metadata": metadata,
+            "preview": text[:2000],
+        }
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
