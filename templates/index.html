@@ -267,6 +267,30 @@
             font-size: 13px;
             cursor: pointer;
         }
+        .ai-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            padding: 0 22px 12px;
+        }
+        .ai-option-group {
+            background: rgba(37,99,235,0.06);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px;
+        }
+        .ai-option-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .ai-option-group select,
+        .ai-option-group input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
         .attachment-row {
             display: flex;
             gap: 8px;
@@ -380,6 +404,30 @@
 
         <div class="drop-hint">Drop files here to attach them. Shortcuts: Ctrl/Cmd + Enter to send, / to focus the box.</div>
 
+        <div class="ai-options">
+            <div class="ai-option-group">
+                <label for="personality-select">Personality</label>
+                <select id="personality-select">
+                    <option value="helpful">Helpful</option>
+                    <option value="analytical">Analytical</option>
+                    <option value="creative">Creative</option>
+                    <option value="concise">Concise</option>
+                </select>
+            </div>
+            <div class="ai-option-group">
+                <label><input type="checkbox" id="memory-toggle" /> Long-term memory</label>
+                <label><input type="checkbox" id="reasoning-toggle" /> Reasoning</label>
+                <label><input type="checkbox" id="reflection-toggle" /> Reflection</label>
+                <label><input type="checkbox" id="planning-toggle" /> Multi-step planning</label>
+            </div>
+            <div class="ai-option-group">
+                <label><input type="checkbox" id="tool-toggle" /> Tool calling</label>
+                <label><input type="checkbox" id="agent-toggle" /> Autonomous agent</label>
+                <label><input type="checkbox" id="self-correct-toggle" /> Self-correction</label>
+                <label><input type="checkbox" id="cot-toggle" /> Chain of thought</label>
+            </div>
+        </div>
+
         <div class="response-controls">
             <button class="response-control" id="regen-btn" type="button">🔁 Regenerate</button>
             <button class="response-control" id="stop-btn" type="button">⏹️ Stop</button>
@@ -416,11 +464,21 @@
         const stopBtn = document.getElementById('stop-btn');
         const continueBtn = document.getElementById('continue-btn');
         const retryBtn = document.getElementById('retry-btn');
+        const personalitySelect = document.getElementById('personality-select');
+        const memoryToggle = document.getElementById('memory-toggle');
+        const reasoningToggle = document.getElementById('reasoning-toggle');
+        const reflectionToggle = document.getElementById('reflection-toggle');
+        const planningToggle = document.getElementById('planning-toggle');
+        const toolToggle = document.getElementById('tool-toggle');
+        const agentToggle = document.getElementById('agent-toggle');
+        const selfCorrectToggle = document.getElementById('self-correct-toggle');
+        const cotToggle = document.getElementById('cot-toggle');
         let editingBubble = null;
         let recognition = null;
         let isListening = false;
         let responseState = { active: false, stopped: false, bubble: null, prompt: '', fullText: '', words: [], index: 0, timer: null };
         let lastPrompt = '';
+        let lastOptions = {};
 
         function createBubble(type) {
             const div = document.createElement('div');
@@ -554,9 +612,23 @@
             regenerateResponse();
         }
 
-        function fetchAnswer(question, botBubble) {
+        function buildAskUrl(question, options) {
+            const params = new URLSearchParams({ question });
+            params.set('personality', options.personality || 'helpful');
+            params.set('reasoning', options.reasoning ? 'true' : 'false');
+            params.set('reflection', options.reflection ? 'true' : 'false');
+            params.set('planning', options.planning ? 'true' : 'false');
+            params.set('long_term_memory', options.long_term_memory ? 'true' : 'false');
+            params.set('tool_calling', options.tool_calling ? 'true' : 'false');
+            params.set('autonomous_agent', options.autonomous_agent ? 'true' : 'false');
+            params.set('self_correction', options.self_correction ? 'true' : 'false');
+            params.set('chain_of_thought', options.chain_of_thought ? 'true' : 'false');
+            return `/ask?${params.toString()}`;
+        }
+
+        function fetchAnswer(question, botBubble, options = {}) {
             const typingBubble = addTypingIndicator();
-            fetch(`/ask?question=${encodeURIComponent(question)}`)
+            fetch(buildAskUrl(question, options))
                 .then((response) => response.json())
                 .then((data) => {
                     chatArea.removeChild(typingBubble);
@@ -729,11 +801,22 @@
             }
             questionInput.value = '';
             lastPrompt = question;
+            lastOptions = {
+                personality: personalitySelect.value,
+                reasoning: reasoningToggle.checked,
+                reflection: reflectionToggle.checked,
+                planning: planningToggle.checked,
+                long_term_memory: memoryToggle.checked,
+                tool_calling: toolToggle.checked,
+                autonomous_agent: agentToggle.checked,
+                self_correction: selfCorrectToggle.checked,
+                chain_of_thought: cotToggle.checked,
+            };
             const botBubble = addBubble('Thinking…', 'bot');
             const typingBubble = addTypingIndicator();
 
             try {
-                const response = await fetch(`/ask?question=${encodeURIComponent(question)}`);
+                const response = await fetch(buildAskUrl(question, lastOptions));
                 const data = await response.json();
                 chatArea.removeChild(typingBubble);
                 const answer = data.answer || 'No answer returned.';
