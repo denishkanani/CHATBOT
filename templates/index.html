@@ -7,11 +7,29 @@
     <style>
         :root {
             --bg: linear-gradient(135deg, #0f172a, #2563eb, #7c3aed);
-            --card: rgba(255,255,255,0.95);
+            --card: rgba(255,255,255,0.97);
             --accent: #2563eb;
             --accent-2: #7c3aed;
             --text: #111827;
             --muted: #6b7280;
+            --border: #e5e7eb;
+            --surface: #f8fafc;
+        }
+        body.dark {
+            --bg: linear-gradient(135deg, #020617, #111827, #1d4ed8);
+            --card: rgba(15, 23, 42, 0.95);
+            --accent: #60a5fa;
+            --accent-2: #a78bfa;
+            --text: #f8fafc;
+            --muted: #cbd5e1;
+            --border: #334155;
+            --surface: #111827;
+        }
+        body.theme-aurora {
+            --bg: linear-gradient(135deg, #7c3aed, #ec4899, #f59e0b);
+        }
+        body.theme-sunset {
+            --bg: linear-gradient(135deg, #9a2c2c, #f97316, #facc15);
         }
         * { box-sizing: border-box; }
         body {
@@ -24,60 +42,116 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            transition: background 0.3s ease, color 0.3s ease;
         }
         .chat-shell {
             width: 100%;
-            max-width: 860px;
+            max-width: 900px;
             background: var(--card);
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            border-radius: 28px;
+            box-shadow: 0 24px 70px rgba(0,0,0,0.22);
             overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.4);
         }
         .hero {
-            padding: 28px 30px;
+            padding: 24px 28px;
             background: linear-gradient(90deg, var(--accent), var(--accent-2));
             color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
         }
-        .hero h1 { margin: 0 0 8px; font-size: 28px; }
-        .hero p { margin: 0; opacity: 0.95; }
+        .hero h1 { margin: 0 0 6px; font-size: 26px; }
+        .hero p { margin: 0; opacity: 0.95; font-size: 14px; }
+        .controls { display: flex; gap: 8px; align-items: center; }
+        .pill-btn {
+            border: none;
+            padding: 8px 10px;
+            border-radius: 999px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 14px;
+        }
         .chat-area {
-            padding: 24px 24px 18px;
+            padding: 22px 22px 16px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
+            min-height: 360px;
+            max-height: 64vh;
+            overflow-y: auto;
+            background: linear-gradient(180deg, var(--surface), transparent);
         }
         .bubble {
-            max-width: 80%;
-            padding: 14px 16px;
-            border-radius: 18px;
-            line-height: 1.5;
-            box-shadow: 0 6px 16px rgba(15,23,42,0.08);
+            max-width: 82%;
+            padding: 13px 15px;
+            border-radius: 20px;
+            line-height: 1.55;
+            box-shadow: 0 8px 18px rgba(15,23,42,0.08);
             white-space: pre-wrap;
+            font-size: 15px;
+            position: relative;
         }
         .bubble.user {
             align-self: flex-end;
-            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
             color: white;
-            border-bottom-right-radius: 4px;
+            border-bottom-right-radius: 6px;
         }
         .bubble.bot {
             align-self: flex-start;
-            background: #f3f4f6;
+            background: var(--card);
             color: var(--text);
-            border-bottom-left-radius: 4px;
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 6px;
+        }
+        .bubble .reactions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        .bubble .react-btn {
+            border: none;
+            background: rgba(0,0,0,0.06);
+            border-radius: 999px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .typing {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .typing span {
+            width: 7px;
+            height: 7px;
+            background: var(--muted);
+            border-radius: 50%;
+            animation: bounce 1.2s infinite ease-in-out;
+        }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
+            40% { transform: translateY(-5px); opacity: 1; }
         }
         form {
             display: flex;
             gap: 10px;
-            padding: 0 24px 24px;
+            padding: 0 22px 22px;
         }
         input[type="text"] {
             flex: 1;
-            padding: 14px 16px;
-            border: 1px solid #d1d5db;
+            padding: 13px 15px;
+            border: 1px solid var(--border);
             border-radius: 999px;
             font-size: 15px;
             outline: none;
+            background: var(--card);
+            color: var(--text);
         }
         input[type="text"]:focus {
             border-color: var(--accent);
@@ -85,26 +159,145 @@
         }
         button {
             border: none;
-            padding: 14px 18px;
+            padding: 13px 16px;
             border-radius: 999px;
             background: linear-gradient(135deg, var(--accent), var(--accent-2));
             color: white;
             cursor: pointer;
             font-weight: 600;
+            transition: transform 0.2s ease;
         }
         button:hover { transform: translateY(-1px); }
-        .hint { color: var(--muted); font-size: 13px; padding: 0 24px 12px; }
+        .toolbar { display: flex; gap: 8px; padding: 0 22px 16px; flex-wrap: wrap; }
+        .chip {
+            background: rgba(37,99,235,0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .emoji-picker {
+            display: flex;
+            gap: 8px;
+            padding: 0 22px 12px;
+            flex-wrap: wrap;
+        }
+        .emoji-btn {
+            border: none;
+            background: var(--surface);
+            color: var(--text);
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+        }
+        .attachment-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 0 22px 12px;
+        }
+        .attachment-btn {
+            border: 1px dashed var(--border);
+            background: var(--surface);
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .conversation-list {
+            display: flex;
+            gap: 8px;
+            padding: 0 22px 12px;
+            overflow-x: auto;
+        }
+        .conversation-pill {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 13px;
+            cursor: pointer;
+            background: var(--surface);
+            white-space: nowrap;
+        }
+        .conversation-pill.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: white;
+            border-color: transparent;
+        }
+        pre {
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 10px;
+            border-radius: 10px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: Consolas, monospace;
+            font-size: 13px;
+        }
+        .hint {
+            color: var(--muted);
+            font-size: 13px;
+            padding: 0 22px 12px;
+        }
+        @media (max-width: 640px) {
+            body { padding: 10px; }
+            .hero { padding: 18px 16px; flex-direction: column; align-items: flex-start; }
+            .chat-area { padding: 16px 16px 12px; min-height: 300px; }
+            .bubble { max-width: 96%; font-size: 14px; }
+            form { padding: 0 16px 16px; }
+            .toolbar { padding: 0 16px 10px; }
+            .hint { padding: 0 16px 10px; }
+        }
     </style>
 </head>
 <body>
     <div class="chat-shell">
         <div class="hero">
-            <h1>✨ Bright AI Chatbot</h1>
-            <p>Ask anything and get a friendly, smart response in seconds.</p>
+            <div>
+                <h1>✨ Bright AI Chatbot</h1>
+                <p>Ask anything and get a friendly, smart response in seconds.</p>
+            </div>
+            <div class="controls">
+                <button class="pill-btn" id="theme-toggle" type="button">🌗</button>
+                <button class="pill-btn" id="search-toggle" type="button">🔎</button>
+            </div>
         </div>
 
         <div class="chat-area" id="chat-area">
-            <div class="bubble bot">Hello! I’m your AI assistant. Ask me anything.</div>
+            <div class="bubble bot">Hello! I’m your AI assistant. Ask me anything. 😊</div>
+        </div>
+
+        <div class="conversation-list" id="conversation-list">
+            <span class="conversation-pill active">Conversation 1</span>
+            <span class="conversation-pill">Conversation 2</span>
+            <span class="conversation-pill">Conversation 3</span>
+        </div>
+
+        <div class="toolbar">
+            <span class="chip">✨ Theme</span>
+            <span class="chip">😀 Emojis</span>
+            <span class="chip">🔍 Search</span>
+            <span class="chip">📌 Pinned</span>
+        </div>
+
+        <div class="emoji-picker">
+            <button class="emoji-btn" type="button">😊</button>
+            <button class="emoji-btn" type="button">👍</button>
+            <button class="emoji-btn" type="button">🚀</button>
+            <button class="emoji-btn" type="button">💡</button>
+        </div>
+
+        <div class="attachment-row">
+            <label class="attachment-btn"><input type="file" id="file-upload" style="display:none" />📎 File</label>
+            <label class="attachment-btn"><input type="file" id="image-upload" accept="image/*" style="display:none" />🖼️ Image</label>
+            <label class="attachment-btn"><input type="file" id="video-upload" accept="video/*" style="display:none" />🎬 Video</label>
+            <button class="attachment-btn" id="voice-btn" type="button">🎤 Voice</button>
         </div>
 
         <div class="hint">Try: “What is Artificial Intelligence?”</div>
@@ -119,36 +312,100 @@
         const form = document.getElementById('chat-form');
         const chatArea = document.getElementById('chat-area');
         const questionInput = document.getElementById('question');
+        const themeToggle = document.getElementById('theme-toggle');
+        const searchToggle = document.getElementById('search-toggle');
+        const voiceBtn = document.getElementById('voice-btn');
+        const conversationList = document.getElementById('conversation-list');
 
-        function addBubble(text, type) {
+        function addBubble(text, type, withReactions = false) {
             const div = document.createElement('div');
             div.className = `bubble ${type}`;
-            div.textContent = text;
+            div.innerHTML = text;
+            if (withReactions) {
+                div.innerHTML += '<div class="reactions"><button class="react-btn">👍</button><button class="react-btn">❤️</button></div>';
+            }
             chatArea.appendChild(div);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
+
+        function addTypingIndicator() {
+            const div = document.createElement('div');
+            div.className = 'bubble bot';
+            div.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            return div;
+        }
+
+        function applyTheme(theme) {
+            document.body.classList.remove('dark', 'theme-aurora', 'theme-sunset');
+            if (theme === 'dark') document.body.classList.add('dark');
+            if (theme === 'aurora') document.body.classList.add('theme-aurora');
+            if (theme === 'sunset') document.body.classList.add('theme-sunset');
+        }
+
+        function renderMarkdown(text) {
+            const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const withLineBreaks = escaped.replace(/\n/g, '<br>');
+            const withCode = withLineBreaks.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            return withCode.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+        }
+
+        let themeMode = 'default';
+        themeToggle.addEventListener('click', () => {
+            themeMode = themeMode === 'default' ? 'dark' : themeMode === 'dark' ? 'aurora' : themeMode === 'aurora' ? 'sunset' : 'default';
+            applyTheme(themeMode);
+        });
+
+        searchToggle.addEventListener('click', () => {
+            const searchTerm = prompt('Search chat history');
+            if (!searchTerm) return;
+            const matches = Array.from(chatArea.querySelectorAll('.bubble')).filter((bubble) => bubble.textContent.toLowerCase().includes(searchTerm.toLowerCase()));
+            if (matches.length) {
+                matches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                addBubble('No matching messages found.', 'bot');
+            }
+        });
+
+        document.querySelectorAll('.emoji-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                questionInput.value += button.textContent;
+                questionInput.focus();
+            });
+        });
+
+        voiceBtn.addEventListener('click', () => {
+            questionInput.value = '🎤 Voice input ready — speak to your assistant.';
+        });
+
+        conversationList.querySelectorAll('.conversation-pill').forEach((pill) => {
+            pill.addEventListener('click', () => {
+                conversationList.querySelectorAll('.conversation-pill').forEach((item) => item.classList.remove('active'));
+                pill.classList.add('active');
+                addBubble(`Switched to ${pill.textContent}`, 'bot');
+            });
+        });
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             const question = questionInput.value.trim();
             if (!question) return;
 
-            addBubble(question, 'user');
+            const displayQuestion = question.replace(/\n/g, '<br>');
+            addBubble(displayQuestion + ' 😊', 'user', true);
             questionInput.value = '';
-            addBubble('Thinking...', 'bot');
+            const typingBubble = addTypingIndicator();
 
             try {
                 const response = await fetch(`/ask?question=${encodeURIComponent(question)}`);
                 const data = await response.json();
-                const lastBubble = chatArea.lastElementChild;
-                if (lastBubble && lastBubble.classList.contains('bot')) {
-                    lastBubble.textContent = data.answer || 'No answer returned.';
-                }
+                chatArea.removeChild(typingBubble);
+                const rendered = renderMarkdown(data.answer || 'No answer returned.');
+                addBubble(rendered, 'bot', true);
             } catch (error) {
-                const lastBubble = chatArea.lastElementChild;
-                if (lastBubble && lastBubble.classList.contains('bot')) {
-                    lastBubble.textContent = 'Error: ' + error.message;
-                }
+                chatArea.removeChild(typingBubble);
+                addBubble('Error: ' + error.message, 'bot');
             }
         });
     </script>
