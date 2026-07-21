@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 760px;
+            margin: 40px auto;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        }
+        h1 { margin-top: 0; }
+        form { display: flex; gap: 10px; margin-top: 20px; }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+        }
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+        .answer {
+            margin-top: 20px;
+            padding: 16px;
+            background: #eff6ff;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Chatbot</h1>
+        <p>Ask a question and get a response from the chatbot.</p>
+        <form id="chat-form">
+            <input id="question" type="text" placeholder="Type your question here" required />
+            <button type="submit">Ask</button>
+        </form>
+        <div id="result" class="answer">Your answer will appear here.</div>
+    </div>
+
+    <script>
+        const form = document.getElementById('chat-form');
+        const result = document.getElementById('result');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const question = document.getElementById('question').value;
+            result.textContent = 'Loading...';
+
+            try {
+                const response = await fetch(`/ask?question=${encodeURIComponent(question)}`);
+                const data = await response.json();
+                result.textContent = data.answer || 'No answer returned.';
+            } catch (error) {
+                result.textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
